@@ -1,0 +1,100 @@
+clim_feats:
+  - clim_clake
+  - clim_ldepth
+  - clim_ctype
+  - clim_cell_area
+  - clim_glm
+  - clim_cu
+  - clim_cvh
+  - clim_cvl
+  - clim_tvh
+  - clim_tvl
+  - clim_sotype
+  - clim_geopot
+  - clim_sdfor
+  - clim_sdor
+  - clim_theta_cap
+  - clim_theta_pwp
+  - clim_veg_covh
+  - clim_veg_covl
+  - clim_veg_z0mh
+  - clim_veg_z0ml
+  - clim_veg_rsminh
+  - clim_veg_rsminl
+
+dynamic_feats:
+  - met_ctpf
+  - met_lwdown
+  - met_psurf
+  - met_qair
+  - met_rainf
+  - met_swdown
+  - met_snowf
+  - met_tair
+  - met_wind_e
+  - met_wind_n
+  - lai_hv
+  - lai_lv
+
+targets_prog:
+  - swvl1
+  - swvl2
+  - swvl3
+  - stl1
+  - stl2
+  - stl3
+  - snowc
+  # - tsn
+
+targets_diag:
+  #- d2m
+  #- t2m
+  #- skt
+
+
+file_path: "/ec/res4/hpcperm/daep/ec_land_training_db/ecland_i8ki_o200_2010_2022_6h.zarr"
+
+start_year: 2015
+end_year: 2019
+
+validation_start: 2020
+validation_end: 2020
+
+test_start: 2021
+test_end: 2021
+
+x_slice_indices:
+  - 0
+  - None
+
+spatial_sample_size: 20
+path_to_boundingbox:  # "src/data/bounding/bb_europe.nc" # None
+
+dyn_transform: "zscoring"
+stat_transform: "zscoring"
+prog_transform: "zscoring" # "max"
+diag_transform: "zscoring"
+
+roll_out: 60  # 4  # 1
+lookback: 24
+
+continue_training: True
+batch_size: 4  # 4  # 4  # 8  # 32
+num_workers: 32  # 8
+hidden_dim: 64  # 128  #90  # 96  # 120
+max_epochs: 300 # 450
+strategy: ddp #_find_unused_parameters_true
+devices: 4
+device:
+
+model: "lstm"
+model_path: "src/lstm/results/global/global/version_0"
+climatology_path: "src/evaluation/analyses/climatology/climatology_6hrly_global.nc" #"src/evaluation/analyses/climatology/climatology_6hrly_europe.nc"
+
+logging:
+   logger: "csv"
+   location: "src/lstm/results/global"
+  # logger: "mlflow"
+  # uri: "file:./mlruns"
+   project: "lstm_global"
+   name: "global"

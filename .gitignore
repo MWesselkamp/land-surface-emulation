@@ -1,0 +1,10 @@
+configs/.ipynb_checkpoints
+shell_scripts/.ipynb_checkpoints
+
+src/evaluation/.ipynb_checkpoints
+src/lstm/.ipynb_checkpoints
+src/mlp/.ipynb_checkpoints
+src/xgb/.ipynb_checkpoints
+src/data/.ipynb_checkpoints
+src/supplement/.ipynb_checkpoints
+
