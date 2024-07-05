@@ -88,7 +88,7 @@ class EcDataset(Dataset):
             print("Chunk size:", self.chunk_size)
         else:
             print("Use all x_idx from global.")
-            self.spatial_simple_size = None
+            self.spatial_sample_size = None
 
         # List of climatological time-invariant features
         self.static_feat_lst = config["clim_feats"]
@@ -289,7 +289,11 @@ class EcDataset(Dataset):
             self.ds_ecland.data[
                 slice(t_start_idx, t_end_idx), :, :
             ]
-        )[:, x_idx, :]
+        )
+        print("x_idx:", x_idx)
+        print("ds_slice shape:", ds_slice.shape)
+        ds_slice = ds_slice[:, x_idx, :]
+        print("ds_slice shape:", ds_slice.shape)
 
         X = ds_slice[:, :, self.dynamic_index]
         X = self.dyn_transform(X, means = self.x_dynamic_means, stds = self.x_dynamic_stdevs, maxs = self.x_dynamic_maxs)

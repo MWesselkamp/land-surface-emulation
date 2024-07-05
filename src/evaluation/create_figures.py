@@ -40,7 +40,7 @@ if args.config_file_lstm == 'None':
 if args.config_file_xgb == 'None':
     args.config_file_xgb = None
     
-configs_path = 'configs'
+configs_path = 'src/configs'
 path_to_figures = 'src/evaluation/figures'
 
 print('config_file_mlp', args.config_file_mlp)
@@ -69,8 +69,9 @@ if args.config_file_mlp is not None:
     
     mlp_model = load_model_with_config(CONFIG)
     mlp_module = ForecastModule(mlp_model)
-    X_static, X_met, Y_prog = mlp_module.get_test_data_global(dataset)
-    mlp_prog, mlp_prog_prediction = mlp_module.step_forecast_global(X_static, X_met, Y_prog)
+    # restructure this if possible. Why return the data here and not just call get_test_data when creating the module with model and dataset?
+    X_static, X_met, Y_prog = mlp_module.get_test_data(dataset)
+    mlp_prog, mlp_prog_prediction = mlp_module.step_forecast(X_static, X_met, Y_prog)
 
     make_ailand_plot(mlp_prog_prediction[:, 85:95, :], 
                      mlp_prog[:, 85:95, :], 
@@ -79,6 +80,7 @@ if args.config_file_mlp is not None:
 
     climatology = mlp_module.get_climatology(CONFIG['climatology_path'])
     print(climatology)
+    # Make the computation of scores part of the evaluation module.
     mlp_performance_total, mlp_performance_targetwise = get_scores_spatial_global(mlp_prog_prediction, mlp_prog, dataset, climatology,
                                                                    targetwise = True, save_to = CONFIG['model_path'])
 
@@ -125,8 +127,9 @@ if args.config_file_lstm is not None:
     
     lstm_model = load_model_with_config(CONFIG, my_device = 'cpu')
     lstm_module = ForecastModule(lstm_model, my_device = 'cpu')
-    
-    if (CONFIG['logging']['name'] == 'global_highres') | (CONFIG['logging']['name'] == 'global'):
+
+    # Clean this!
+    if CONFIG['logging']['name'] in ('global_highres', 'global', 'global_1h'):
 
         total_size = dataset.x_size
         print("TOTAL DATA SIZE:", total_size)
@@ -156,9 +159,9 @@ if args.config_file_lstm is not None:
                                      config_temp['test_end'])
     
             # Get the test data for the current chunk
-            X_static, X_met, Y_prog = lstm_module.get_test_data_global(dataset_temp)
+            X_static, X_met, Y_prog = lstm_module.get_test_data(dataset_temp, chunk_idx = (start_idx, end_idx))
 
-            lstm_prog_chunk, lstm_prog_prediction_chunk = lstm_module.step_forecast_global(X_static, X_met, Y_prog)
+            lstm_prog_chunk, lstm_prog_prediction_chunk = lstm_module.step_forecast(X_static, X_met, Y_prog)
     
             lstm_prog_chunks.append(lstm_prog_chunk)
             lstm_prog_prediction_chunks.append(lstm_prog_prediction_chunk)
@@ -167,11 +170,11 @@ if args.config_file_lstm is not None:
         lstm_prog_prediction = np.concatenate(lstm_prog_prediction_chunks, axis=1)        
     
     elif (CONFIG['logging']['name'] ==  'europe'):
-        X_static, X_met, Y_prog = lstm_module.get_test_data_global(dataset)
+        X_static, X_met, Y_prog = lstm_module.get_test_data(dataset)
         print("X_static:", X_static.shape)
         print("X_met:", X_met.shape)
         print("Y_prog:", Y_prog.shape)
-        lstm_prog, lstm_prog_prediction = lstm_module.step_forecast_global(X_static, X_met, Y_prog)
+        lstm_prog, lstm_prog_prediction = lstm_module.step_forecast(X_static, X_met, Y_prog)
     else:
         print("DONT KNOW HOW TO LOAD DATA")
 
@@ -230,11 +233,11 @@ if args.config_file_xgb is not None:
     xgb_model = load_model_with_config(CONFIG, my_device = 'cpu')
 
     xgb_module = ForecastModule(xgb_model, my_device = 'cpu')
-    X_static, X_met, Y_prog = xgb_module.get_test_data_global(dataset)
+    X_static, X_met, Y_prog = xgb_module.get_test_data(dataset)
     print("X_static:", X_static.shape)
     print("X_met:", X_met.shape)
     print("Y_prog:", Y_prog.shape)
-    xgb_prog, xgb_prog_prediction = xgb_module.step_forecast_global(X_static, X_met, Y_prog)
+    xgb_prog, xgb_prog_prediction = xgb_module.step_forecast(X_static, X_met, Y_prog)
 
     make_ailand_plot(xgb_prog_prediction[:, 85:95, :], 
                      xgb_prog[:, 85:95, :], 
