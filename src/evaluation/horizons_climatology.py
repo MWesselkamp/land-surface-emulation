@@ -1,6 +1,11 @@
 """
 Script to create forecast horizon plots. Requires multiprocessing library.
 For long lead times, run on a node with 256Gb memory.
+
+Specify cores for mp in shell script:
+For LSTM on 1 GPU, share on max. 12 cpus.
+For XGB, share on 60 cpus.
+For MLP, share on ? cpus.
 """
 
 import torch.multiprocessing as mp
@@ -36,7 +41,7 @@ parser.add_argument('--num_cpus', type=int, help='Specify num cpus.')
 args = parser.parse_args()
 
 path_to_results = 'src/evaluation/analyses/europe/forecast_horizons' # None
-configs_path = 'configs'
+configs_path = 'src/configs'
 
 print("Computing forecast horizons for config:", args.config_file)
 print("Computing forecast horizons for target:", args.target)
@@ -48,12 +53,8 @@ def init_worker(module):
     global evaluation_module
     evaluation_module = module
 
-def process_input_total(i):
-    result = evaluation_module.iterate_initial_time_total(i)
-    return result
-
-def process_input_target(i):
-    result = evaluation_module.iterate_initial_time_target(i)
+def process_input(i):
+    result = evaluation_module.iterate_initial_times(i)
     return result
     
 
@@ -77,37 +78,31 @@ if __name__ == '__main__':
     print("Time idxs:", time_idxs ) # 1350
 
     # specify evaluation module outside of process_input function.
-    module = EvaluationModule(forecast_module, score = args.score)
+    module = EvaluationModule(forecast_module, 
+                              lead_time = time_idxs,
+                              score = args.score)
     module.set_test_data(dataset)
     module.set_climatology(CONFIG['climatology_path'])
-    module.set_lead_time(time_idxs)
-    
-    num_iterations = time_idxs  # total number of iterations
+    if args.target in CONFIG['targets_prog']:
+        print("Will compute horizons for target: ", args.target)
+        module.set_target(args.target)
+
     num_cpus = args.num_cpus  # os.cpu_count()
-    inputs = range(num_iterations)
+    inputs = range(time_idxs) # total number of iterations
 
     start_time = time.time()
     print("Start horizons computation.")
-    
-    if args.target == 'total':
-        with Pool(num_cpus, initializer=init_worker, initargs=(module,)) as pool:
-            scores_total = pool.map(process_input_total, inputs)
             
-    elif args.target in CONFIG['targets_prog']:
-        module.set_target(args.target, CONFIG['targets_prog'])
-        with Pool(num_cpus, initializer=init_worker, initargs=(module,)) as pool:
-            scores_total = pool.map(process_input_target, inputs)
-
-    else:
-        print("Don't know prognostic variable!")
+    with Pool(num_cpus, initializer=init_worker, initargs=(module,)) as pool:
+        scores_total = pool.map(process_input, inputs)
 
     end_time = time.time()
     duration = (end_time - start_time)/60
     print("Time required for horizons compuation ... minutes ...:", duration)
 
     times = np.array(dataset.times[CONFIG['lookback']:time_idxs])
-
     print(times)
+    
     module.plot_heatmap(scores = scores_total,
                         times = times,
                         discrete_classes = 10,

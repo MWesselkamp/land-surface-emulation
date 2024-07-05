@@ -20,7 +20,7 @@ from utils.utils import r2_score_multi, anomaly_correlation, standardized_anomal
 
 class EvaluationModule:
     
-    def __init__(self, forecast_module, score = 'rmse', path_to_results = None):
+    def __init__(self, forecast_module, lead_time, score = 'rmse', path_to_results = None):
         
         print("Model type is:", type(forecast_module.model))
         
@@ -28,22 +28,19 @@ class EvaluationModule:
         self.init_score = score
         self.targ_idx = None
         self.path_to_results = path_to_results
+        self.time_idxs = lead_time
         
-        if score == 'rmse':
-            print("Evaluation with ", score)
-            self.score = self.rmse
-        elif score == 'mae':
-            print("Evaluation with ", score)
-            self.score = self.mae
-        elif score == 'r2':
-            print("Evaluation with ", score)
-            self.score = self.r2
-        elif score == 'acc':
-            print("Evaluation with ", score)
-            self.score = self.acc
-        elif score == 'scaled_anom':
-            print("Evaluation with ", score)
-            self.score = self.scaled_anom
+        score_methods = {
+            'rmse': self.rmse,
+            'mae': self.mae,
+            'r2': self.r2,
+            'acc': self.acc,
+            'scaled_anom': self.scaled_anom
+        }
+
+        if score in score_methods:
+            print("Evaluation with", score)
+            self.score = score_methods[score]
         else:
             print("Don't know score!")
             
@@ -175,49 +172,89 @@ class EvaluationModule:
                                          clim_std = self.climatology_std[t, :, self.targ_idx, np.newaxis]) for t in range(Y_prog_prediction.shape[0])])
         return eval_array
 
-    def skillscore_target(self, Y):
+    def evaluate_skillscore_target(self, Y):
         eval_array = np.array([self.score(Y[t, :, self.targ_idx, np.newaxis],  
                                           clim_mu = self.climatology_mu[t, :, self.targ_idx, np.newaxis],
                                          clim_std = self.climatology_std[t, :, self.targ_idx, np.newaxis]) for t in range(Y.shape[0])])
         return eval_array
 
     def set_test_data(self, dataset):
-        self.X_static, self.X_met, self.Y_prog = self.forecast_module.get_test_data_global(dataset)
+        """
+        Run outside of class.
+        Args:
+            dataset: specify from data_module.EcDataset.
+        """
+        # suboptimal to require forecast module here.
+        self.targ_lst = dataset.targ_lst
+        self.X_static, self.X_met, self.Y_prog = self.forecast_module.get_test_data(dataset)
 
     def set_climatology(self, file_path):
+
         """
+        Needs to be called before computing skill scores.
         Evaluates to None if no path to climatology is provided in config.
+        Args:
+            file_path: Specify path to load climatology from.
+            variability: Load climatological mean (False) or standard deviation (True)?
         """
-        self.climatology_mu = self.forecast_module.get_climatology(file_path)
-        self.climatology_std = self.forecast_module.get_climatology(file_path, variability = True)
+        
+        if file_path is not None:
+            
+            climatology = xr.open_dataset(file_path)
+            climatology_mu = climatology['clim_6hr_mu'].sel(variable=self.targ_lst).values
+            self.climatology_mu = np.tile(climatology_mu, (2, 1, 1))
+            climatology_std = climatology['clim_6hr_std'].sel(variable=self.targ_lst).values
+            self.climatology_std = np.tile(climatology_std, (2, 1, 1))
 
-    def set_lead_time(self, lead_time):
-        """
-        Set manually in main script.
-        """
-        self.time_idxs = lead_time
+        else:
+            self.climatology_mu = None
+            self.climatology_std = None
 
-    def set_target(self, target, targ_lst):
+    def set_target(self, target):
+        """
+        Needs to be specified before iterating initial times for target-specific horizons, otherwise will be None.
+        """
         self.targ = target
-        self.targ_idx = list(targ_lst).index(self.targ)
+        self.targ_idx = list(self.targ_lst).index(self.targ)
 
     def run_forecast(self, X_static, X_met, Y_prog):
-        return self.forecast_module.step_forecast_global(X_static, X_met, Y_prog)
+        """
+        Convenience function.
+        """
+        return self.forecast_module.step_forecast(X_static, X_met, Y_prog)
         
-    def iterate_initial_time_total(self, start_idx):
+    def iterate_initial_times(self, start_idx):
 
+        """
+        Implemented for computing ACC forecast horizons.
+        Args:
+            start_idx: initial time to start forecast run.
+        """
+        
         print("Intital time at: ", start_idx)
         
         Y_prog_idx = self.Y_prog[start_idx:(start_idx + self.time_idxs), ...]
         X_met_idx = self.X_met[start_idx:(start_idx + self.time_idxs), ...]
         
         Y_prog_idx, Y_prog_prediction_idx = self.run_forecast(self.X_static, X_met_idx, Y_prog_idx)
-            
-        scores = self.evaluate_total(Y_prog_idx, Y_prog_prediction_idx)
+
+        if self.targ_idx is None:
+            print("Evaluating on all prognostic target states simulatenously")
+            scores = self.evaluate_total(Y_prog_idx, Y_prog_prediction_idx)
+        else:
+            print("Evaluating on target: ", self.targ)
+            scores = self.evaluate_target(Y_prog_idx, Y_prog_prediction_idx)
 
         return scores
         
-    def iterate_initial_time_target(self, start_idx):
+
+    def iterate_initial_times_skillscore(self, start_idx):
+
+        """
+        Implemented for standardized anomaly persistence and for target-specific forecast horizons, i.e. not option of total evaluation. Creates a plot every 50th time step.
+        Args:
+            start_idx: initial time to start forecast run.
+        """
 
         if self.targ_idx is None:
             print("SPECIFY TARGET!")
@@ -229,24 +266,8 @@ class EvaluationModule:
         
         Y_prog_idx, Y_prog_prediction_idx = self.run_forecast(self.X_static, X_met_idx, Y_prog_idx)
 
-        scores = self.evaluate_target(Y_prog_idx, Y_prog_prediction_idx)
-                        
-        return scores
-
-    def iterate_initial_time_skillscore_target(self, start_idx):
-
-        if self.targ_idx is None:
-            print("SPECIFY TARGET!")
-            
-        print("Intital time at: ", start_idx)
-
-        Y_prog_idx = self.Y_prog[start_idx:(start_idx + self.time_idxs), ...]
-        X_met_idx = self.X_met[start_idx:(start_idx + self.time_idxs), ...]
-        
-        Y_prog_idx, Y_prog_prediction_idx = self.run_forecast(self.X_static, X_met_idx, Y_prog_idx)
-
-        preds_scores = self.skillscore_target(Y_prog_prediction_idx)
-        ref_scores = self.skillscore_target(Y_prog_idx)
+        preds_scores = self.evaluate_skillscore_target(Y_prog_prediction_idx)
+        ref_scores = self.evaluate_skillscore_target(Y_prog_idx)
         persistence = np.repeat(ref_scores[0], preds_scores.shape[0])
                         
         skillscore = 1 - np.abs(preds_scores[1:])/np.abs(persistence[1:])
