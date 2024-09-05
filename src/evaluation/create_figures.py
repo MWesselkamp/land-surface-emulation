@@ -15,10 +15,10 @@ sys.path.append(os.path.dirname(SCRIPT_DIR))
 print(SCRIPT_DIR)
 
 from evaluation.forecast_module import ForecastModule
-from evaluation.helpers import load_model_from_checkpoint, load_model_with_config
+from evaluation.helpers import *
 from data.data_module import EcDataset, NonLinRegDataModule
-from utils.visualise import make_ailand_plot,make_ailand_plot_combined, plot_score_map, plot_losses, plot_losses_targetwise,plot_losses_targetwise_boxplots, boxplot_scores_single, boxplot_scores_single_new, plot_scores_temporal_targetwise_cumulative, plot_correlation_scatter, plot_correlation_scatter_binned
-from utils.utils import r2_score_multi, get_scores_spatial_global, get_scores_temporal, assemble_scores
+from utils.visualise import *
+from utils.utils import *
 
 def nullable_string(val):
     if not val:
@@ -49,12 +49,7 @@ print('config_file_xgb', args.config_file_xgb)
 
 if args.config_file_mlp is not None:
 
-    with open(os.path.join(configs_path, args.config_file_mlp)) as stream:
-        try:
-            CONFIG = yaml.safe_load(stream)
-            print(f"Opening {args.config_file_mlp} for experiment configuration.")
-        except yaml.YAMLError as exc:
-            print(exc)
+    CONFIG = load_config(configs_path, args.config_file_mlp)
 
     data_module = NonLinRegDataModule(CONFIG)
     dataset = EcDataset(CONFIG, 
@@ -63,13 +58,11 @@ if args.config_file_mlp is not None:
 
     losses = pd.read_csv(os.path.join(CONFIG['model_path'], 'metrics.csv'))
 
-    plot_losses(losses, save_to = CONFIG['model_path'])
-    plot_losses_targetwise(losses, save_to = CONFIG['model_path'], label = "SmoothL1")
-    plot_losses_targetwise_boxplots(losses, save_to = CONFIG['model_path'], label = "SmoothL1", log = False)
+    plot_losses_and_metrics(losses, config= CONFIG)
     
     mlp_model = load_model_with_config(CONFIG)
     mlp_module = ForecastModule(mlp_model)
-    # restructure this if possible. Why return the data here and not just call get_test_data when creating the module with model and dataset?
+    
     X_static, X_met, Y_prog = mlp_module.get_test_data(dataset)
     mlp_prog, mlp_prog_prediction = mlp_module.step_forecast(X_static, X_met, Y_prog)
 
@@ -106,13 +99,7 @@ if args.config_file_mlp is not None:
 
 if args.config_file_lstm is not None:
     
-
-    with open(os.path.join(configs_path, args.config_file_lstm)) as stream:
-        try:
-            CONFIG = yaml.safe_load(stream)
-            print(f"Opening {args.config_file_lstm} for experiment configuration.")
-        except yaml.YAMLError as exc:
-            print(exc)
+    CONFIG = load_config(configs_path, args.config_file_lstm)
     
     #data_module = NonLinRegDataModule(CONFIG)
     dataset = EcDataset(CONFIG, 
@@ -121,9 +108,7 @@ if args.config_file_lstm is not None:
 
     losses = pd.read_csv(os.path.join(CONFIG['model_path'], 'metrics.csv'))
 
-    plot_losses(losses, which='loss_logit', save_to = CONFIG['model_path'])
-    plot_losses_targetwise(losses, save_to = CONFIG['model_path'], label = "SmoothL1")
-    plot_losses_targetwise_boxplots(losses, save_to = CONFIG['model_path'], label = "SmoothL1", log = False)
+    plot_losses_and_metrics(losses, config= CONFIG)
     
     lstm_model = load_model_with_config(CONFIG, my_device = 'cpu')
     lstm_module = ForecastModule(lstm_model, my_device = 'cpu')
@@ -172,12 +157,7 @@ if args.config_file_lstm is not None:
 
 if args.config_file_xgb is not None:
 
-    with open(os.path.join(configs_path, args.config_file_xgb)) as stream:
-        try:
-            CONFIG = yaml.safe_load(stream)
-            print(f"Opening {args.config_file_xgb} for experiment configuration.")
-        except yaml.YAMLError as exc:
-            print(exc)
+    CONFIG = load_config(configs_path, args.config_file_xgb)
 
     data_module = NonLinRegDataModule(CONFIG)
     dataset = EcDataset(CONFIG, 

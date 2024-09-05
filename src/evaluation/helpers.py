@@ -7,6 +7,7 @@ import numpy as np
 import xgboost as xgb
 
 from torch import tensor
+from utils.visualise import *
 
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 sys.path.append(os.path.dirname(SCRIPT_DIR))
@@ -19,6 +20,25 @@ else:
 DEVICE = dev
 print(DEVICE)
 
+def plot_losses_and_metrics(losses, config):
+    """Plot various loss metrics."""
+    plot_losses(losses, which='loss_logit', save_to=config['model_path'])
+    plot_losses_targetwise(losses, save_to=config['model_path'], label="SmoothL1")
+    plot_losses_targetwise_boxplots(losses, save_to=config['model_path'], label="SmoothL1", log=False)
+
+
+def load_config(configs_path, config_file):
+    """Load configuration from a YAML file."""
+    config_path = os.path.join(configs_path, config_file)
+    try:
+        with open(config_path) as stream:
+            config = yaml.safe_load(stream)
+            print(f"Opening {config_file} for experiment configuration.")
+            return config
+    except yaml.YAMLError as exc:
+        print(exc)
+        return None
+        
 def process_chunkwise(dataset, config, lstm_module, chunk_size):
     """Process data in chunks and run forecasts."""
     total_size = dataset.x_size
