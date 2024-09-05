@@ -128,56 +128,13 @@ if args.config_file_lstm is not None:
     lstm_model = load_model_with_config(CONFIG, my_device = 'cpu')
     lstm_module = ForecastModule(lstm_model, my_device = 'cpu')
 
-    # Clean this!
     if CONFIG['logging']['name'] in ('global_highres', 'global', 'global_1h'):
-
-        total_size = dataset.x_size
-        print("TOTAL DATA SIZE:", total_size)
-        chunk_size = 23000  
-    
-        # Calculate the number of chunks needed to cover the full data set
-        num_chunks = (total_size + chunk_size - 1) // chunk_size 
-        print("SPLIT DATA IN CHUNKS:", num_chunks)
-        
-        lstm_prog_chunks = []
-        lstm_prog_prediction_chunks = []
-    
-        for i in range(num_chunks):
-            
-            # Calculate the start and end indices for each chunk
-            start_idx = i * chunk_size
-            end_idx = min((i + 1) * chunk_size, total_size)
-            print("CHUNK start:", start_idx)
-            print("CHUNK end:", end_idx)
-    
-            # Update the configuration with the current slice indices
-            config_temp = CONFIG.copy()
-            config_temp["x_slice_indices"] = (start_idx, end_idx)
-    
-            dataset_temp = EcDataset(config_temp, 
-                                     config_temp['test_start'],
-                                     config_temp['test_end'])
-    
-            # Get the test data for the current chunk
-            X_static, X_met, Y_prog = lstm_module.get_test_data(dataset_temp, chunk_idx = (start_idx, end_idx))
-
-            lstm_prog_chunk, lstm_prog_prediction_chunk = lstm_module.step_forecast(X_static, X_met, Y_prog)
-    
-            lstm_prog_chunks.append(lstm_prog_chunk)
-            lstm_prog_prediction_chunks.append(lstm_prog_prediction_chunk)
-    
-        lstm_prog = np.concatenate(lstm_prog_chunks, axis=1)
-        lstm_prog_prediction = np.concatenate(lstm_prog_prediction_chunks, axis=1)        
-    
-    elif (CONFIG['logging']['name'] ==  'europe'):
-        X_static, X_met, Y_prog = lstm_module.get_test_data(dataset)
-        print("X_static:", X_static.shape)
-        print("X_met:", X_met.shape)
-        print("Y_prog:", Y_prog.shape)
-        lstm_prog, lstm_prog_prediction = lstm_module.step_forecast(X_static, X_met, Y_prog)
+        lstm_prog, lstm_prog_prediction = process_chunkwise(dataset, CONFIG, lstm_module,chunk_size = 23000)
+    elif CONFIG['logging']['name'] == 'europe':
+        lstm_prog, lstm_prog_prediction = process_full_dataset(dataset, lstm_module)
     else:
         print("DONT KNOW HOW TO LOAD DATA")
-
+        
     make_ailand_plot(lstm_prog_prediction[:, 85:95, :], 
                      lstm_prog[:, 85:95, :], 
                      lstm_prog.shape[-1],
@@ -205,10 +162,7 @@ if args.config_file_lstm is not None:
 
     lstm_best_gridcell =  np.argmin(np.array(lstm_performance_total['rmse']))
     lstm_worst_gridcell =  np.argmax(np.array(lstm_performance_total['rmse']))
-    print("Worst grid cell in RMSE:", np.argmax(np.array(lstm_performance_total['rmse'])))
-    print("Best grid cell in RMSE:", np.argmin(np.array(lstm_performance_total['rmse'])))
-    print("Worst grid cell in R2:", np.argmin(np.array(lstm_performance_total['r2'])))
-    print("Best grid cell in R2:", np.argmax(np.array(lstm_performance_total['r2'])))
+    print_best_and_worst_gridcells(lstm_performance_total)
 
     if climatology is not None:
         plot_score_map(lstm_performance_total, error='acc', vmin = 0, vmax = None, cmap = "PuOr", transparent = True, save_to = CONFIG['model_path'], file=f'total', ax=None, cb = 'cb')
@@ -263,10 +217,7 @@ if args.config_file_xgb is not None:
         print(assembled_scores)
         print("")
 
-    print("Worst grid cell in RMSE:", np.argmax(np.array(xgb_performance_total['rmse'])))
-    print("Best grid cell in RMSE:", np.argmin(np.array(xgb_performance_total['rmse'])))
-    print("Worst grid cell in R2:", np.argmin(np.array(xgb_performance_total['r2'])))
-    print("Best grid cell in R2:", np.argmax(np.array(xgb_performance_total['r2'])))
+    print_best_and_worst_gridcells(xgb_performance_total)
 
     plot_score_map(xgb_performance_total, error='acc', vmin = 0,vmax = None, cmap = "PuOr", transparent = True, save_to = CONFIG['model_path'], file=f'total', ax=None, cb = 'cb')
     plot_score_map(xgb_performance_total, error='r2', vmin = 0.98,vmax = None, cmap = "PuOr", transparent = True, save_to = CONFIG['model_path'], file=f'total', ax=None, cb = 'cb')

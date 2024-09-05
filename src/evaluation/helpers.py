@@ -2,6 +2,8 @@ import sys
 import os
 import torch 
 import yaml
+import pandas as pd
+import numpy as np
 import xgboost as xgb
 
 from torch import tensor
@@ -16,6 +18,51 @@ else:
     dev = "cpu"
 DEVICE = dev
 print(DEVICE)
+
+def process_chunkwise(dataset, config, lstm_module, chunk_size):
+    """Process data in chunks and run forecasts."""
+    total_size = dataset.x_size
+    print("TOTAL DATA SIZE:", total_size)
+    num_chunks = (total_size + chunk_size - 1) // chunk_size 
+    print("SPLIT DATA IN CHUNKS:", num_chunks)
+
+    lstm_prog_chunks = []
+    lstm_prog_prediction_chunks = []
+
+    for i in range(num_chunks):
+        
+        start_idx = i * chunk_size
+        end_idx = min((i + 1) * chunk_size, total_size)
+        print(f"CHUNK start: {start_idx}, CHUNK end: {end_idx}")
+
+        config_temp = config.copy()
+        config_temp["x_slice_indices"] = (start_idx, end_idx)
+
+        dataset_temp = EcDataset(config_temp, config_temp['test_start'], config_temp['test_end'])
+        X_static, X_met, Y_prog = lstm_module.get_test_data(dataset_temp, chunk_idx=(start_idx, end_idx))
+
+        lstm_prog_chunk, lstm_prog_prediction_chunk = lstm_module.step_forecast(X_static, X_met, Y_prog)
+        lstm_prog_chunks.append(lstm_prog_chunk)
+        lstm_prog_prediction_chunks.append(lstm_prog_prediction_chunk)
+
+    lstm_prog = np.concatenate(lstm_prog_chunks, axis=1)
+    lstm_prog_prediction = np.concatenate(lstm_prog_prediction_chunks, axis=1)
+    return lstm_prog, lstm_prog_prediction
+
+def process_full_dataset(dataset, lstm_module):
+    """Process the entire dataset at once and run forecasts."""
+    X_static, X_met, Y_prog = lstm_module.get_test_data(dataset)
+    print(f"X_static: {X_static.shape}, X_met: {X_met.shape}, Y_prog: {Y_prog.shape}")
+    return lstm_module.step_forecast(X_static, X_met, Y_prog)
+
+def print_best_and_worst_gridcells(lstm_performance_total):
+    
+    """Print the best and worst grid cells based on performance metrics."""
+    print("Worst grid cell in RMSE:", np.argmax(np.array(lstm_performance_total['rmse'])))
+    print("Best grid cell in RMSE:", np.argmin(np.array(lstm_performance_total['rmse'])))
+    print("Worst grid cell in R2:", np.argmin(np.array(lstm_performance_total['r2'])))
+    print("Best grid cell in R2:", np.argmax(np.array(lstm_performance_total['r2'])))
+
 
 def load_model_from_checkpoint(path_to_results, modelname = 'lstm', my_device = None):
 
