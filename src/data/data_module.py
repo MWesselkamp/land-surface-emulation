@@ -40,8 +40,6 @@ class EcDataset(Dataset):
     ):
         
         x_idxs=config["x_slice_indices"]
-        
-        self.min_spatial_sample = config["spatial_sample_size"]
             
         path=config["file_path"]
         
@@ -64,6 +62,7 @@ class EcDataset(Dataset):
         self.start_index = min(np.argwhere(date_times.year == int(start_yr)))[0]
         self.end_index = max(np.argwhere(date_times.year == int(end_yr)))[0]
         print("Start index", self.start_index)
+        
         if self.model == 'lstm':
             self.start_index = self.start_index - self.lookback
             print("Start index", self.start_index)
@@ -78,14 +77,16 @@ class EcDataset(Dataset):
         self.lats = self.ds_ecland["lat"][slice(*self.x_idxs)]
         self.lons = self.ds_ecland["lon"][slice(*self.x_idxs)]
 
-        # If spatial sampling is active, create container with random indices.
-        if self.min_spatial_sample is not None:
+        # Decide if spatial sampling will be activated.
+        if config["spatial_sample_size"] is not None:
             print("Activate spatial sampling of x_idxs")
-            self.spatial_sample_size = self.find_spatial_sample_size(self.min_spatial_sample)
+            # call to class function for finding usable sampling size
+            self.spatial_sample_size = self.find_spatial_sample_size(config["spatial_sample_size"])
             print("Spatial sample size:", self.spatial_sample_size)
+            # call to class function for returning a container with chunk ids
             self.chunked_x_idxs = self.chunk_indices(self.spatial_sample_size)
             self.chunk_size = len(self.chunked_x_idxs)
-            print("Chunk size:", self.chunk_size)
+            print("Chunk container size:", self.chunk_size)
         else:
             print("Use all x_idx from global.")
             self.spatial_sample_size = None
@@ -140,20 +141,34 @@ class EcDataset(Dataset):
         self.x_static_scaled = self.stat_transform(
             x_static, means = self.clim_means, stds = self.clim_stdevs, maxs = self.clim_maxs
         ).reshape(1, self.x_size, -1)
-
-    def chunk_indices(self, chunk_size = 2000):
-
+    
+    def chunk_indices(self, chunk_size):
+        """
+        Takes the output from find_spatial_sample_size to create a container of chunked spatial indices.
+        """
+        # Generate a list of indices from 0 to x_size - 1
         indices = list(range(self.x_size))
+    
+        # Randomly shuffle the indices to ensure spatial chunks are not ordered
         random.shuffle(indices)
-        
+    
+        # Divide the shuffled indices into chunks of the specified size
         spatial_chunks = [indices[i:i + chunk_size] for i in range(0, self.x_size, chunk_size)]
         
         return spatial_chunks
 
     def find_spatial_sample_size(self, limit):
-
+        """
+        Needed to cover all spatial points with the chunking: Returns the minimum valid divisor based on limit. 
+        Limit needs to be specified in config["spatial_sample_size"].
+        """
+        # Iterate over possible chunk sizes starting from 'limit' up to 'x_size'
         for i in range(limit, self.x_size):
+            
+            # Check if 'i' is a divisor of 'x_size'
             if self.x_size % i == 0:
+                
+                # Return the first valid chunk size found
                 return i
 
     def select_transform(self, transform_spec):
@@ -281,6 +296,7 @@ class EcDataset(Dataset):
         t_end_idx = (idx % (self.len_dataset - 1 - self.rollout)) + self.start_index + self.lookback + self.rollout + 1
         
         if self.spatial_sample_size is not None:
+            # access to one chunk of spatial index chunk container.
             x_idx = [x + self.x_idxs[0] for x in self.chunked_x_idxs[(idx % self.chunk_size)]]
         else:
             x_idx = (idx % self.x_size) + self.x_idxs[0]
