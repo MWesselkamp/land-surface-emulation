@@ -14,23 +14,21 @@ SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 sys.path.append(os.path.dirname(SCRIPT_DIR))
 print(SCRIPT_DIR)
 
-from evaluation.forecast_module import ForecastModule
+from evaluation.forecast_module import *
 from evaluation.helpers import *
-from data.data_module import EcDataset, NonLinRegDataModule
+from data.data_module import *
 from utils.visualise import *
 from utils.utils import *
 
+# Helper function for nullable string
 def nullable_string(val):
-    if not val:
-        return None
-    return val
+    return None if not val else val
 
+# Argument parser setup
 parser = argparse.ArgumentParser(description="Load different config files for training.")
-
 parser.add_argument('--config_file_mlp', type=nullable_string, help='Specify .yaml file from same directory.')
 parser.add_argument('--config_file_lstm', type=nullable_string, help='Specify .yaml file from same directory.')
 parser.add_argument('--config_file_xgb', type=nullable_string, help='Specify .yaml file from same directory.')
-
 args = parser.parse_args()
 
 if args.config_file_mlp == 'None':
@@ -51,34 +49,11 @@ if args.config_file_mlp is not None:
 
     CONFIG = load_config(configs_path, args.config_file_mlp)
 
-    data_module = NonLinRegDataModule(CONFIG)
-    dataset = EcDataset(CONFIG, 
-                       CONFIG['test_start'],
-                       CONFIG['test_end'])
-
     losses = pd.read_csv(os.path.join(CONFIG['model_path'], 'metrics.csv'))
 
     plot_losses_and_metrics(losses, config= CONFIG)
     
-    mlp_model = load_model_with_config(CONFIG)
-    mlp_module = ForecastModule(mlp_model)
-    
-    X_static, X_met, Y_prog = mlp_module.get_test_data(dataset)
-    mlp_prog, mlp_prog_prediction = mlp_module.step_forecast(X_static, X_met, Y_prog)
-
-    make_ailand_plot(mlp_prog_prediction[:, 85:95, :], 
-                     mlp_prog[:, 85:95, :], 
-                     mlp_prog.shape[-1],
-                      save_to = os.path.join(CONFIG['model_path'], 'ailand_plot.pdf'))
-
-    climatology = mlp_module.get_climatology(CONFIG['climatology_path'])
-    print(climatology)
-    # Make the computation of scores part of the evaluation module.
-    mlp_performance_total, mlp_performance_targetwise = get_scores_spatial_global(mlp_prog_prediction, mlp_prog, dataset, climatology,
-                                                                   targetwise = True, save_to = CONFIG['model_path'])
-
-    mlp_performance_total_temp, mlp_performance_targetwise_temp = get_scores_temporal(mlp_prog_prediction, mlp_prog,
-                                                                                    dataset, climatology, save_to = CONFIG['model_path'])
+    mlp_performance_total, mlp_performance_targetwise = load_and_process_model(CONFIG, model_name= CONFIG['model'])
 
     scores_by_model = {'MLP': mlp_performance_total}
     assembled_scores = assemble_scores(scores_by_model)
@@ -100,38 +75,12 @@ if args.config_file_mlp is not None:
 if args.config_file_lstm is not None:
     
     CONFIG = load_config(configs_path, args.config_file_lstm)
-    
-    #data_module = NonLinRegDataModule(CONFIG)
-    dataset = EcDataset(CONFIG, 
-                   CONFIG['test_start'],
-                   CONFIG['test_end'])
 
     losses = pd.read_csv(os.path.join(CONFIG['model_path'], 'metrics.csv'))
 
     plot_losses_and_metrics(losses, config= CONFIG)
-    
-    lstm_model = load_model_with_config(CONFIG, my_device = 'cpu')
-    lstm_module = ForecastModule(lstm_model, my_device = 'cpu')
-
-    if CONFIG['logging']['name'] in ('global_highres', 'global', 'global_1h'):
-        lstm_prog, lstm_prog_prediction = process_chunkwise(dataset, CONFIG, lstm_module,chunk_size = 23000)
-    elif CONFIG['logging']['name'] == 'europe':
-        lstm_prog, lstm_prog_prediction = process_full_dataset(dataset, lstm_module)
-    else:
-        print("DONT KNOW HOW TO LOAD DATA")
         
-    make_ailand_plot(lstm_prog_prediction[:, 85:95, :], 
-                     lstm_prog[:, 85:95, :], 
-                     lstm_prog.shape[-1],
-                      save_to = os.path.join(CONFIG['model_path'], 'ailand_plot.pdf'))
-
-    climatology = lstm_module.get_climatology(CONFIG['climatology_path'])
-    lstm_performance_total, lstm_performance_targetwise = get_scores_spatial_global(lstm_prog_prediction, lstm_prog,
-                                                                                    dataset, climatology,
-                                                                   targetwise = True, save_to = CONFIG['model_path'])
-
-    lstm_performance_total_temp, lstm_performance_targetwise_temp = get_scores_temporal(lstm_prog_prediction, lstm_prog,
-                                                                                    dataset, climatology, save_to = CONFIG['model_path'])
+    lstm_performance_total, lstm_performance_targetwise = load_and_process_model(CONFIG, model_name= CONFIG['model'])
     
     scores_by_model = {'LSTM': lstm_performance_total}
     assembled_scores = assemble_scores(scores_by_model)
@@ -159,31 +108,7 @@ if args.config_file_xgb is not None:
 
     CONFIG = load_config(configs_path, args.config_file_xgb)
 
-    data_module = NonLinRegDataModule(CONFIG)
-    dataset = EcDataset(CONFIG, 
-                       CONFIG['test_start'],
-                       CONFIG['test_end'])
-
-    xgb_model = load_model_with_config(CONFIG, my_device = 'cpu')
-
-    xgb_module = ForecastModule(xgb_model, my_device = 'cpu')
-    X_static, X_met, Y_prog = xgb_module.get_test_data(dataset)
-    print("X_static:", X_static.shape)
-    print("X_met:", X_met.shape)
-    print("Y_prog:", Y_prog.shape)
-    xgb_prog, xgb_prog_prediction = xgb_module.step_forecast(X_static, X_met, Y_prog)
-
-    make_ailand_plot(xgb_prog_prediction[:, 85:95, :], 
-                     xgb_prog[:, 85:95, :], 
-                     xgb_prog.shape[-1],
-                      save_to = os.path.join(CONFIG['model_path'], 'ailand_plot.pdf'))
-
-    climatology = xgb_module.get_climatology(CONFIG['climatology_path'])
-    xgb_performance_total, xgb_performance_targetwise = get_scores_spatial_global(xgb_prog_prediction, xgb_prog, dataset, climatology,
-                                                                   targetwise = True, save_to = CONFIG['model_path'])
-
-    xgb_performance_total_temp, xgb_performance_targetwise_temp = get_scores_temporal(xgb_prog_prediction, xgb_prog,
-                                                                                    dataset, climatology, save_to = CONFIG['model_path'])
+    xgb_performance_total, xgb_performance_targetwise = load_and_process_model(CONFIG, model_name=  CONFIG['model'])
     
     scores_by_model = {'XGB': xgb_performance_total}
     assembled_scores = assemble_scores(scores_by_model)
@@ -250,15 +175,6 @@ else:
         assembled_scores = assemble_scores(targ_scores_by_model)
         print(assembled_scores.round(4))
         print("")
-    
-    fig, axs = plt.subplots(1, 3, figsize=(24, 8))
-    plot_scores_temporal_targetwise_cumulative(xgb_performance_targetwise_temp, score = 'acc', ax = axs[0], file = 'XGB')
-    plot_scores_temporal_targetwise_cumulative(mlp_performance_targetwise_temp, score = 'acc', ax = axs[1], file = 'MLP')
-    plot_scores_temporal_targetwise_cumulative(lstm_performance_targetwise_temp, score = 'acc', ax = axs[2], file = 'LSTM')
-    plt.tight_layout()
-    plt.savefig(os.path.join(path_to_figures, f"scores_temporal_combined_acc.pdf"))
-    plt.show()
-    plt.close()
 
     # Aggregate list of total and targetwise model scores
     model_scores_total = [xgb_performance_total, mlp_performance_total, lstm_performance_total]

@@ -9,7 +9,12 @@ import matplotlib.pyplot as plt
 import cartopy.crs as ccrs
 
 from torch import tensor
+
+from evaluation.forecast_module import *
+from evaluation.helpers import *
+from data.data_module import *
 from utils.visualise import *
+from utils.utils import *
 
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 sys.path.append(os.path.dirname(SCRIPT_DIR))
@@ -43,6 +48,49 @@ def plot_losses_and_metrics(losses, config):
     plot_losses(losses, which='loss_logit', save_to=config['model_path'])
     plot_losses_targetwise(losses, save_to=config['model_path'], label="SmoothL1")
     plot_losses_targetwise_boxplots(losses, save_to=config['model_path'], label="SmoothL1", log=False)
+
+# Load and process model results
+def load_and_process_model(config_file, model_name):
+    
+    if config_file is None:
+        return None, None
+    
+    CONFIG = load_config(configs_path, config_file)
+    dataset = EcDataset(CONFIG, CONFIG['test_start'], CONFIG['test_end'])
+    
+    # Load and evaluate the model
+    if model_name == 'lstm':
+        
+        model = load_model_with_config(CONFIG, my_device = 'cpu')
+        module = ForecastModule(lstm_model, my_device = 'cpu')
+    
+        if CONFIG['logging']['name'] in ('global_highres', 'global', 'global_1h'):
+            model_prog, model_prog_prediction = process_chunkwise(dataset, CONFIG, module,chunk_size = 23000)
+        elif CONFIG['logging']['name'] == 'europe':
+            model_prog, model_prog_prediction = process_full_dataset(dataset, module)
+        else:
+            print("DONT KNOW HOW TO LOAD DATA")
+            
+    else:
+        
+        model = load_model_with_config(CONFIG)
+        module = ForecastModule(model)
+        X_static, X_met, Y_prog = module.get_test_data(dataset)
+        model_prog, model_prog_prediction = module.step_forecast(X_static, X_met, Y_prog)
+    
+    make_ailand_plot(model_prog_prediction[:, 85:95, :], 
+                         model_prog[:, 85:95, :], 
+                         model_prog.shape[-1],
+                         save_to=os.path.join(CONFIG['model_path'], 'ailand_plot.pdf'))
+    
+    climatology = module.get_climatology(CONFIG['climatology_path'])
+    
+    performance_total, performance_targetwise = get_scores_spatial_global(
+        model_prog_prediction, model_prog, dataset, climatology, 
+        targetwise=True, save_to=CONFIG['model_path']
+    )
+    
+    return performance_total, performance_targetwise
 
 
 def load_config(configs_path, config_file):
