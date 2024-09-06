@@ -260,63 +260,47 @@ else:
     plt.show()
     plt.close()
 
+    # Aggregate list of total and targetwise model scores
+    model_scores_total = [xgb_performance_total, mlp_performance_total, lstm_performance_total]
+    model_scores_targetwise = [xgb_performance_targetwise, mlp_performance_targetwise, lstm_performance_targetwise]
+    
+    # Target labels for plotting
+    targ_lst_labels = [
+        "Soil Moisture Layer 1", "Soil Moisture Layer 2", "Soil Moisture Layer 3", 
+        "Soil Temperature Layer 1", "Soil Temperature Layer 2", "Soil Temperature Layer 3", 
+        "Snow Cover Fraction"
+    ]
+
     scores = ['r2', 'acc', 'rmse', 'mae']
     
-    for s in scores:
+    for score in scores:
         
-        vmin = 0.98 if s == 'r2' else 0        
-        fig, axs = plt.subplots(1, 3, figsize=(24, 8), subplot_kw={'projection': ccrs.PlateCarree()})
-        plot_score_map(xgb_performance_total, error=s, vmin = vmin,vmax = None, cmap = "PuOr", transparent = True, 
-                   save_to = path_to_figures, file=f'total_xgb', ax= axs[0])
-        plot_score_map(mlp_performance_total, error=s, vmin = vmin,vmax = None, cmap = "PuOr", transparent = True, 
-                   save_to = path_to_figures, file=f'total_mlp', ax= axs[1])
-        plot_score_map(lstm_performance_total, error=s, vmin = vmin,vmax = None, cmap = "PuOr", transparent = True, 
-                   save_to = path_to_figures, file=f'total_lstm', ax= axs[2])
-        plt.tight_layout()
-        plt.savefig(os.path.join(path_to_figures, f"score_maps_combined_{s}.pdf"))
-        plt.show()
-        plt.close()
+        vmin = 0.98 if s == 'r2' else 0      
 
-        for targ in CONFIG['targets_prog']:
+        plot_model_map_comparison(model_scores_total, score, vmin, path_to_figures, filename_prefix = score, target='total')
 
-            fig, axs = plt.subplots(1, 3, figsize=(24, 8), subplot_kw={'projection': ccrs.PlateCarree()})
-            plot_score_map(xgb_performance_targetwise[targ], error=s, vmin = vmin,vmax = None, cmap = "PuOr", transparent = True, 
-                   save_to = path_to_figures, file=f'total_xgb', ax= axs[0])
-            plot_score_map(mlp_performance_targetwise[targ], error=s, vmin = vmin,vmax = None, cmap = "PuOr", transparent = True, 
-                   save_to = path_to_figures, file=f'total_mlp', ax= axs[1])
-            plot_score_map(lstm_performance_targetwise[targ], error=s, vmin = vmin,vmax = None, cmap = "PuOr", transparent = True, 
-                   save_to = path_to_figures, file=f'total_lstm', ax= axs[2])
-            plt.tight_layout()
-            plt.savefig(os.path.join(path_to_figures, f"score_maps_combined_{s}_{targ}.pdf"))
-            plt.show()
-            plt.close()
+        for target in CONFIG['targets_prog']:
+
+            models_performance_target = [model[target] for model in models_targetwise]
+
+            plot_model_map_comparison(model_scores_total, score, vmin, path_to_figures, filename_prefix = score, target=target)
+
+            boxplot_scores_single_new(xgb_performance_targetwise[target], mlp_performance_targetwise[target], lstm_performance_targetwise[target],
+                score=score, log=False if score in ['r2', 'acc'] else True, data='europe', target=target, save_to=path_to_figures
+            )
+
             
-        boxplot_scores_single_new(xgb_performance_total, 
-                             mlp_performance_total, 
-                             lstm_performance_total, 
-                             score = s,
-                             log= False if s in ['r2', 'acc'] else True, 
-                              data='europe', target = 'total', save_to = path_to_figures)
+        boxplot_scores_single_new(xgb_performance_total, mlp_performance_total, lstm_performance_total, 
+            score=score, log=False if score in ['r2', 'acc'] else True, data='europe', target='total', save_to=path_to_figures
+    )
 
-        
-
-        i = 0
-        targ_lst_labels = ["Soil Moisture Layer 1", "Soil Moisture Layer 2", "Soil Moisture Layer 3", 
-                       "Soil Temperature Layer 1", "Soil Temperature Layer 2", "Soil Temperature Layer 3", 
-                       "Snow Cover Fraction"]
-        for targ in CONFIG['targets_prog']:
-            boxplot_scores_single_new(xgb_performance_targetwise[targ], 
-                                 mlp_performance_targetwise[targ], 
-                                 lstm_performance_targetwise[targ], 
-                                 score = s,
-                                 log= False if s in ['r2', 'acc'] else True, 
-                                  data='europe', target = targ, save_to = path_to_figures)
-
-            plot_correlation_scatter_binned([xgb_prog[:, :, i], mlp_prog[:, :, i], lstm_prog[:, :, i]], 
-                                        [xgb_prog_prediction[:, :, i], mlp_prog_prediction[:, :, i], lstm_prog_prediction[:, :, i]], 
-                                        targ_lst_labels[i], save_to = os.path.join(path_to_figures, f"correlations_{targ}.pdf"))
-
-            i += 1
+        # Scatter plot correlations for each target
+        for i, target in enumerate(CONFIG['targets_prog']):
+            plot_correlation_scatter_binned(
+                [xgb_prog[:, :, i], mlp_prog[:, :, i], lstm_prog[:, :, i]],
+                [xgb_prog_prediction[:, :, i], mlp_prog_prediction[:, :, i], lstm_prog_prediction[:, :, i]],
+                targ_lst_labels[i], save_to=os.path.join(path_to_figures, f"correlations_{target}.pdf")
+            )
 
 
 

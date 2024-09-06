@@ -5,6 +5,8 @@ import yaml
 import pandas as pd
 import numpy as np
 import xgboost as xgb
+import matplotlib.pyplot as plt
+import cartopy.crs as ccrs
 
 from torch import tensor
 from utils.visualise import *
@@ -19,6 +21,22 @@ else:
     dev = "cpu"
 DEVICE = dev
 print(DEVICE)
+
+def plot_model_map_comparison(models_performance, score, vmin, path_to_figures, filename_prefix, target='total'):
+    fig, axs = plt.subplots(1, 3, figsize=(24, 8), subplot_kw={'projection': ccrs.PlateCarree()})
+    model_names = ['xgb', 'mlp', 'lstm']
+    
+    for i, (model_performance, name) in enumerate(zip(models_performance, model_names)):
+        plot_score_map(
+            model_performance, error=score, vmin=vmin, vmax=None, cmap="PuOr", 
+            transparent=True, save_to=path_to_figures, file=f'{filename_prefix}_{name}', ax=axs[i]
+        )
+    
+    plt.tight_layout()
+    plt.savefig(os.path.join(path_to_figures, f"score_maps_combined_{score}_{target}.pdf"))
+    plt.show()
+    plt.close()
+    
 
 def plot_losses_and_metrics(losses, config):
     """Plot various loss metrics."""
