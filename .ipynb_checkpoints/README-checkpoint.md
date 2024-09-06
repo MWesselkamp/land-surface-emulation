@@ -1,4 +1,4 @@
-# land-surface-emulation
+# Land surface emulation
 
 This repository contains source code for the three land surface emulators introduced in the work "Advances in Land Surface Model-based Forecasting: A comparative study of LSTM, Gradient Boosting, and Feedforward Neural Network Models as prognostic state emulators". (see Arxiv pre-print: https://doi.org/10.48550/arXiv.2407.16463)
 
@@ -6,7 +6,7 @@ Data sources for creating emulators are ERA5 meteorological and physiographic fi
 
 - src - source code for model development
 - configs - files for experiment configurations described in Wesselkamp et al.
-- shell_scripts - bash scripts for running experiments on GPU/CPU node of an HPC.
+- shell_scripts - bash scripts for running experiments on GPU/CPU node of HPC.
 
 ## Source code structure 
 
@@ -39,4 +39,4 @@ Four parameters control how data is normalized or transformed before being passe
 
 ### System parameters
 
-Models are set up to run in a distributed training environment. Specifing *strategy* to ddp chooses the distributed training strategy with Pytorch Lightning used for multiple GPU training. Devices specifies the number of GPUs to be used for training 
+Models are set up to run in a distributed training environment. Specifing *strategy* to ddp chooses the distributed training strategy with Pytorch Lightning used for multiple GPU training. *devices* specifies the number of GPUs to be used for training. 
