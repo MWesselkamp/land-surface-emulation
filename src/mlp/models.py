@@ -10,10 +10,8 @@ import torchmetrics
 from torch import tensor
 
 try:
-    from mlp_2D.ec_database import TorchStandardScalerFeatTens
     from utils.utils import r2_score_multi
 except ModuleNotFoundError:
-    from src.mlp_2D.ec_database import TorchStandardScalerFeatTens
     from src.utils.utils import r2_score_multi
 from pytorch_lightning.utilities import grad_norm
 

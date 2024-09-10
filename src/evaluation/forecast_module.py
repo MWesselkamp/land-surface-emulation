@@ -71,6 +71,16 @@ class ForecastModule:
         self.dataset = dataset
 
         return X_static, X_met, Y_prog
+
+    def get_climatology(self, file_path, targ_lst):    
+
+        climatology = xr.open_dataset(file_path)
+        climatology_mu = climatology['clim_6hr_mu'].sel(variable=targ_lst).values
+        climatology_mu = np.tile(climatology_mu, (2, 1, 1))
+        climatology_std = climatology['clim_6hr_std'].sel(variable=targ_lst).values
+        climatology_std = np.tile(climatology_std, (2, 1, 1))
+        
+        return climatology_mu, climatology_std
         
     
     def step_forecast(self, X_static, X_met, Y_prog):

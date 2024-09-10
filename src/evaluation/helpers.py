@@ -50,7 +50,7 @@ def plot_losses_and_metrics(losses, config):
     plot_losses_targetwise_boxplots(losses, save_to=config['model_path'], label="SmoothL1", log=False)
 
 # Load and process model results
-def load_and_process_model(config_file, model_name):
+def load_and_process_model(config_file, configs_path, model_name):
     
     if config_file is None:
         return None, None
@@ -62,7 +62,7 @@ def load_and_process_model(config_file, model_name):
     if model_name == 'lstm':
         
         model = load_model_with_config(CONFIG, my_device = 'cpu')
-        module = ForecastModule(lstm_model, my_device = 'cpu')
+        module = ForecastModule(model, my_device = 'cpu')
     
         if CONFIG['logging']['name'] in ('global_highres', 'global', 'global_1h'):
             model_prog, model_prog_prediction = process_chunkwise(dataset, CONFIG, module,chunk_size = 23000)
@@ -83,14 +83,14 @@ def load_and_process_model(config_file, model_name):
                          model_prog.shape[-1],
                          save_to=os.path.join(CONFIG['model_path'], 'ailand_plot.pdf'))
     
-    climatology = module.get_climatology(CONFIG['climatology_path'])
+    climatology, _ = module.get_climatology(CONFIG['climatology_path'], CONFIG['targets_prog'])
     
     performance_total, performance_targetwise = get_scores_spatial_global(
         model_prog_prediction, model_prog, dataset, climatology, 
         targetwise=True, save_to=CONFIG['model_path']
     )
     
-    return performance_total, performance_targetwise
+    return performance_total, performance_targetwise, model_prog, model_prog_prediction
 
 
 def load_config(configs_path, config_file):
@@ -185,7 +185,7 @@ def load_model_from_checkpoint(path_to_results, modelname = 'lstm', my_device = 
     if 'mlp_2D' in path_to_results:
         
         if ('mlp' == modelname):
-            from mlp_2D.models import MLPregressor
+            from mlp.models import MLPregressor
             print("Set up model: mlp_2D")
             
             model = MLPregressor(input_size=hpars['input_size'], 
@@ -200,7 +200,7 @@ def load_model_from_checkpoint(path_to_results, modelname = 'lstm', my_device = 
                              dropout=hpars['dropout'])
             
         elif ('mlp_global' == modelname):
-            from mlp_2D.models import MLPregressor_global as MLPregressor
+            from mlp.models import MLPregressor_global as MLPregressor
             print("Set up model: mlp_2D global")
             
             model = MLPregressor(input_clim_dim = hpars['input_clim_dim'],
@@ -223,15 +223,15 @@ def load_model_from_checkpoint(path_to_results, modelname = 'lstm', my_device = 
     elif ('lstm_2D' in path_to_results) | ('lstm' == modelname) | ('leadtime' in modelname) :
         
         if ('lstm_statesemb_logtransform' == modelname):
-            from lstm_2D.models import LSTM_m2m_statesemb as LSTMregressor
+            from lstm.models import LSTM_m2m_statesemb as LSTMregressor
         elif ('lstm_autoencoder' == modelname):
-            from lstm_2D.models import LSTM_m2m_autoencoder as LSTMregressor
+            from lstm.models import LSTM_m2m_autoencoder as LSTMregressor
         elif ('lstm_autoencoder_nc' == modelname):
-            from lstm_2D.models import LSTM_m2m_autoencoder_nc as LSTMregressor
+            from lstm.models import LSTM_m2m_autoencoder_nc as LSTMregressor
         elif ('lstm_global' == modelname):
-            from lstm_2D.models import LSTM_m2m_global as LSTMregressor
+            from lstm.models import LSTM_m2m_global as LSTMregressor
         elif ('leadtime' in modelname):
-            from lstm_2D.models import LSTM_m2m_autoencoder_nc as LSTMregressor
+            from lstm.models import LSTM_m2m_autoencoder_nc as LSTMregressor
         else:
             print("Specify which model to load!")
             print("Choose from: lstm_basic,lstm_basic_usedlogits,lstm_statesemb, lstm_projector")
@@ -335,7 +335,7 @@ def load_model_with_config(config, my_device = None):
     
         if ('global' in config['logging']['name']) | ('europe' in config['logging']['name']):
 
-            from mlp_2D.models import MLPregressor_global as MLPregressor
+            from mlp.models import MLPregressor_global as MLPregressor
             print("Set up model: mlp_2D global")
 
             model = MLPregressor(input_clim_dim = hpars['input_clim_dim'],
@@ -357,7 +357,7 @@ def load_model_with_config(config, my_device = None):
 
 
         else:
-            from mlp_2D.models import MLPregressor
+            from mlp.models import MLPregressor
             print("Set up model: mlp_2D")
 
             model = MLPregressor(input_size=hpars['input_size'], 
@@ -377,10 +377,10 @@ def load_model_with_config(config, my_device = None):
     elif config['model'] == 'lstm':
         
         if ('fieldsemb' in config['logging']['name']):
-            from lstm_2D.models import LSTM_m2m_global_fieldsemb as LSTMregressor
+            from lstm.models import LSTM_m2m_global_fieldsemb as LSTMregressor
             print("Set up model: lstm_2D global fieldsemb")
         else:
-            from lstm_2D.models import LSTM_m2m_global as LSTMregressor
+            from lstm.models import LSTM_m2m_global as LSTMregressor
             print("Set up model: lstm_2D global")
             
         model = LSTMregressor(input_clim_dim = hpars['input_clim_dim'] ,

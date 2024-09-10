@@ -38,8 +38,8 @@ if args.config_file_lstm == 'None':
 if args.config_file_xgb == 'None':
     args.config_file_xgb = None
     
-configs_path = 'src/configs'
-path_to_figures = 'src/evaluation/figures'
+configs_path = 'configs'
+path_to_figures = 'src/evaluation/figures/europe'
 
 print('config_file_mlp', args.config_file_mlp)
 print('config_file_lstm', args.config_file_lstm)
@@ -50,10 +50,9 @@ if args.config_file_mlp is not None:
     CONFIG = load_config(configs_path, args.config_file_mlp)
 
     losses = pd.read_csv(os.path.join(CONFIG['model_path'], 'metrics.csv'))
-
     plot_losses_and_metrics(losses, config= CONFIG)
     
-    mlp_performance_total, mlp_performance_targetwise = load_and_process_model(CONFIG, model_name= CONFIG['model'])
+    mlp_performance_total, mlp_performance_targetwise, mlp_prog, mlp_prog_prediction = load_and_process_model(args.config_file_mlp, configs_path, model_name= CONFIG['model'])
 
     scores_by_model = {'MLP': mlp_performance_total}
     assembled_scores = assemble_scores(scores_by_model)
@@ -77,10 +76,9 @@ if args.config_file_lstm is not None:
     CONFIG = load_config(configs_path, args.config_file_lstm)
 
     losses = pd.read_csv(os.path.join(CONFIG['model_path'], 'metrics.csv'))
-
     plot_losses_and_metrics(losses, config= CONFIG)
         
-    lstm_performance_total, lstm_performance_targetwise = load_and_process_model(CONFIG, model_name= CONFIG['model'])
+    lstm_performance_total, lstm_performance_targetwise, lstm_prog, lstm_prog_prediction = load_and_process_model(args.config_file_lstm, configs_path, model_name= CONFIG['model'])
     
     scores_by_model = {'LSTM': lstm_performance_total}
     assembled_scores = assemble_scores(scores_by_model)
@@ -98,8 +96,7 @@ if args.config_file_lstm is not None:
     lstm_worst_gridcell =  np.argmax(np.array(lstm_performance_total['rmse']))
     print_best_and_worst_gridcells(lstm_performance_total)
 
-    if climatology is not None:
-        plot_score_map(lstm_performance_total, error='acc', vmin = 0, vmax = None, cmap = "PuOr", transparent = True, save_to = CONFIG['model_path'], file=f'total', ax=None, cb = 'cb')
+    plot_score_map(lstm_performance_total, error='acc', vmin = 0, vmax = None, cmap = "PuOr", transparent = True, save_to = CONFIG['model_path'], file=f'total', ax=None, cb = 'cb')
     plot_score_map(lstm_performance_total, error='r2', vmin = 0.98,vmax = None, cmap = "PuOr", transparent = True, save_to = CONFIG['model_path'], file=f'total', ax=None, cb = 'cb')
     plot_score_map(lstm_performance_total, error='rmse', vmin = 0,vmax = None, cmap = "PuOr_r", transparent = True, save_to = CONFIG['model_path'], file=f'total', ax=None, cb = 'cb')
     plot_score_map(lstm_performance_total, error='mae', vmin = 0,vmax = None, cmap = "PuOr_r", transparent = True, save_to = CONFIG['model_path'], file=f'total', ax=None, cb = 'cb')
@@ -107,8 +104,9 @@ if args.config_file_lstm is not None:
 if args.config_file_xgb is not None:
 
     CONFIG = load_config(configs_path, args.config_file_xgb)
+    dataset = EcDataset(CONFIG, CONFIG['test_start'], CONFIG['test_end'])
 
-    xgb_performance_total, xgb_performance_targetwise = load_and_process_model(CONFIG, model_name=  CONFIG['model'])
+    xgb_performance_total, xgb_performance_targetwise, xgb_prog, xgb_prog_prediction = load_and_process_model(args.config_file_xgb, configs_path, model_name=  CONFIG['model'])
     
     scores_by_model = {'XGB': xgb_performance_total}
     assembled_scores = assemble_scores(scores_by_model)
@@ -144,8 +142,8 @@ else:
                               lstm_prog_prediction[:, lstm_worst_gridcell,np.newaxis,  :], 
                               target_size = 7,
                               period = dataset.times,
-                              save_to = os.path.join(path_to_figures, 'europe'),
-                             filename = 'ailand_plot_combined_worstgridcell.pdf')
+                              save_to = path_to_figures,
+                              filename = 'ailand_plot_combined_worstgridcell.pdf')
 
     make_ailand_plot_combined(lstm_prog[:, lstm_best_gridcell, np.newaxis, :], 
                               xgb_prog_prediction[:, lstm_best_gridcell, np.newaxis,  :],
@@ -153,8 +151,8 @@ else:
                               lstm_prog_prediction[:, lstm_best_gridcell,np.newaxis,  :], 
                               target_size = 7,
                               period = dataset.times,
-                              save_to = os.path.join(path_to_figures, 'europe'),
-                             filename = 'ailand_plot_combined_bestgridcell.pdf')
+                              save_to = path_to_figures,
+                              filename = 'ailand_plot_combined_bestgridcell.pdf')
 
     print("")
     print("MEAN SCORES")
@@ -191,15 +189,15 @@ else:
     
     for score in scores:
         
-        vmin = 0.98 if s == 'r2' else 0      
+        vmin = 0.98 if score == 'r2' else 0      
 
         plot_model_map_comparison(model_scores_total, score, vmin, path_to_figures, filename_prefix = score, target='total')
 
         for target in CONFIG['targets_prog']:
 
-            models_performance_target = [model[target] for model in models_targetwise]
+            models_performance_target = [model[target] for model in model_scores_targetwise]
 
-            plot_model_map_comparison(model_scores_total, score, vmin, path_to_figures, filename_prefix = score, target=target)
+            plot_model_map_comparison(models_performance_target, score, vmin, path_to_figures, filename_prefix = score, target=target)
 
             boxplot_scores_single_new(xgb_performance_targetwise[target], mlp_performance_targetwise[target], lstm_performance_targetwise[target],
                 score=score, log=False if score in ['r2', 'acc'] else True, data='europe', target=target, save_to=path_to_figures

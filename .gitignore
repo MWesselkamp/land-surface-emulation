@@ -8,4 +8,18 @@ src/xgb/.ipynb_checkpoints
 src/data/.ipynb_checkpoints
 src/supplement/.ipynb_checkpoints
 
+src/mlp/results
+src/lstm/results
+src/xgb/results
+src/evaluation/figures
+src/evaluation/analyses
+
 .ipynb_checkpoints/README-checkpoint.md
+src/utils/.ipynb_checkpoints/
+
+src/utils/__pycache__/
+src/xgb/__pycache__/
+src/mlp/__pycache__/
+src/lstm/__pycache__/
+src/evaluation/__pycache__/
+src/data/__pycache__/

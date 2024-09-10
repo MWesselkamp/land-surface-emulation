@@ -20,12 +20,12 @@
 # export NCCL_SOCKET_IFNAME=ib0,lo
 
 # generic settings
-WORKDIR=/home/${USER}/PycharmProjects/ECLand_DLforecasting
+WORKDIR=/home/${USER}/PycharmProjects/land-surface-emulation
 
 cd $WORKDIR
 module purge
 module load conda
 conda activate /perm/pamw/venvs/mytorchcuda
 
-srun python3 src/evaluation/create_figures.py --config_file_mlp mlp_global_config.yaml --config_file_lstm lstm_global_config.yaml --config_file_xgb xgb_global_config.yaml 
+srun python3 src/evaluation/create_results.py --config_file_mlp mlp_europe.yaml --config_file_lstm lstm_europe.yaml --config_file_xgb xgb_europe.yaml 
 

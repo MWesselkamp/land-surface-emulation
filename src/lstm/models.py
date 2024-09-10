@@ -16,10 +16,8 @@ import zarr
 from torch import tensor
 
 try:
-    from lstm_2D.ec_database import TorchStandardScalerFeatTens
     from utils.utils import r2_score_multi, seed_everything
 except ModuleNotFoundError:
-    from src.lstm_2D.ec_database import TorchStandardScalerFeatTens
     from src.utils.utils import r2_score_multi, seed_everything
 
 if torch.cuda.is_available():

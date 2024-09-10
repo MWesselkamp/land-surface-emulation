@@ -87,8 +87,8 @@ devices: 2
 device:
 
 model: "mlp"
-model_path: "src/mlp/results/global/europe/version_0" # /checkpoints/last.ckpt
-climatology_path: "src/evaluation/analyses/climatology/climatology_6hrly_europe.nc"
+model_path: "src/mlp/results/europe/version_0" # /checkpoints/last.ckpt
+climatology_path: "/perm/pamw/land-surface-emulator/climatology_6hrly_europe.nc"
 
 logging:
    logger: "csv"

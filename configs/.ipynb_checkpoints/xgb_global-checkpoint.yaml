@@ -85,8 +85,8 @@ devices: 2
 device:
 
 model: "xgb"
-model_path: "src/xgb/results/global/global"
-climatology_path: "src/evaluation/analyses/climatology/climatology_6hrly_global.nc"
+model_path: "src/xgb/results/global"
+climatology_path: "/perm/pamw/land-surface-emulator/climatology_6hrly_global.nc"
 
 logging:
    logger: "csv"

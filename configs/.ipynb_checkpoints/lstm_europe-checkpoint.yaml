@@ -87,8 +87,8 @@ devices: 4
 device:
 
 model: "lstm"
-model_path: "src/lstm/results/global/europe/version_0"
-climatology_path: "src/evaluation/analyses/climatology/climatology_6hrly_europe.nc"
+model_path: "src/lstm/results/europe/version_0"
+climatology_path: "/perm/pamw/land-surface-emulator/climatology_6hrly_europe.nc"
 
 logging:
    logger: "csv"
