@@ -8,7 +8,7 @@ Data sources for creating emulators are ERA5 meteorological and physiographic fi
 - configs - files for experiment configurations described in Wesselkamp et al.
 - shell_scripts - bash scripts for running experiments on GPU/CPU node of HPC.
 
-## Source code structure 
+## Code structure 
 
 - src/data: contains data module and data_loader.
 
